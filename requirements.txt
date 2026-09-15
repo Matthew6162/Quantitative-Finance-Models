@@ -1,0 +1,15 @@
+# Pin these to the exact versions you're actually running before you
+# consider this "done" -- see note in chat. Placeholder names only for now.
+numpy
+matplotlib
+scipy
+seaborn
+
+# Automatic differentiation (second, independent ground truth for the Greeks,
+# alongside the finite-difference checks) -- see src/validation_jax.py.
+jax
+
+# Market data and tabular handling for the empirical notebooks
+# (notebooks/Monte_Carlo_VaR.ipynb, notebooks/signal_research/).
+pandas
+yfinance
