@@ -1,5 +1,7 @@
 # Quantitative Finance Models
 
+[![tests](https://github.com/Matthew6162/Quantitative-Finance-Models/actions/workflows/tests.yml/badge.svg)](https://github.com/Matthew6162/Quantitative-Finance-Models/actions/workflows/tests.yml)
+
 Derivatives pricing and risk models in Python: stochastic volatility, jump diffusion,
 Monte Carlo VaR, and Black-Scholes Greeks cross-validated with finite differences and
 automatic differentiation.
