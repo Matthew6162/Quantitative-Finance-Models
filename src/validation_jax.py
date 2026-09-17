@@ -20,14 +20,21 @@ below must run before any JAX array touches this process, which is why it's
 at import time here rather than left for a notebook cell to remember.
 """
 
+from __future__ import annotations
+
 import jax
 jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
 from jax.scipy.stats import norm
 
+# jax.grad refuses to differentiate with respect to an integer argument, which
+# numpy would silently upcast, so every parameter is annotated as a float and
+# callers must pass float(S) rather than a bare int.
 
-def bs_price_jax(S, K, r, q, sigma, T):
+
+def bs_price_jax(S: float, K: float, r: float, q: float, sigma: float,
+                 T: float) -> tuple[jax.Array, jax.Array]:
     """Black-Scholes call/put price, written with jax.numpy/jax.scipy so
     jax.grad can trace and differentiate it. Same formula as
     src.validation.bs_price -- only the array library changes."""
@@ -38,7 +45,8 @@ def bs_price_jax(S, K, r, q, sigma, T):
     return call, put
 
 
-def call_price_jax(S, K, r, q, sigma, T):
+def call_price_jax(S: float, K: float, r: float, q: float, sigma: float,
+                   T: float) -> jax.Array:
     """Scalar-output wrapper around bs_price_jax.
 
     jax.grad requires a function that returns a single scalar -- it can't
@@ -50,6 +58,7 @@ def call_price_jax(S, K, r, q, sigma, T):
     return bs_price_jax(S, K, r, q, sigma, T)[0]
 
 
-def put_price_jax(S, K, r, q, sigma, T):
+def put_price_jax(S: float, K: float, r: float, q: float, sigma: float,
+                  T: float) -> jax.Array:
     """Scalar-output wrapper around bs_price_jax -- see call_price_jax."""
     return bs_price_jax(S, K, r, q, sigma, T)[1]

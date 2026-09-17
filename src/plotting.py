@@ -6,8 +6,17 @@ need to import matplotlib to run them. This module is imported by the
 notebook only.
 """
 
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
+import numpy as np
+import numpy.typing as npt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
+
+Array = npt.NDArray[np.float64]
+Series = Array | tuple[Array, Array]  # one curve, or a (call, put) pair
 
 # Categorical colours (from a colour-vision-deficiency-validated palette),
 # assigned to whichever method names show up in `results`, in the order
@@ -19,7 +28,9 @@ from matplotlib.lines import Line2D
 _METHOD_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]  # blue, orange, aqua, yellow
 
 
-def plot_error_sweep(x, x_label, results, ncols=3, axis_size=(4, 3)):
+def plot_error_sweep(x: Array, x_label: str, results: dict[str, dict[str, Series]],
+                     ncols: int = 3,
+                     axis_size: tuple[float, float] = (4, 3)) -> tuple[Figure, npt.NDArray]:
     """Grid of relative-error-vs-parameter subplots, one per Greek, comparing
     one or more validation methods (e.g. finite differences vs JAX autodiff)
     against each other on the same axes.

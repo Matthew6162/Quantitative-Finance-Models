@@ -8,17 +8,42 @@ the finite-difference validation suite that checks every function here against
 an independently-written pricer.
 """
 
+from __future__ import annotations
+
 import numpy as np
+import numpy.typing as npt
 import scipy.stats as stats
 
-d_1 = lambda S, K, r, q, sigma, T: (np.log(S / K) + (r - q + (sigma ** 2) / 2) * T) / (sigma * np.sqrt(T))
+Array = npt.NDArray[np.float64]
+Num = npt.ArrayLike  # a float, or an array of floats broadcast elementwise
+
+# Every function below is vectorised: pass scalars for a single option, or arrays
+# to sweep a parameter. Returns are numpy arrays in either case, 0-d for scalar
+# input. Greeks that differ between call and put return a (call, put) tuple; the
+# rest return a single array because the value is identical for both.
 
 
-def safety(x):
+def d_1(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num) -> Array:
+    """The Black-Scholes d1 term, shared by every formula below."""
+    return (np.log(S / K) + (r - q + (sigma ** 2) / 2) * T) / (sigma * np.sqrt(T))
+
+
+def safety(x: Num) -> Array:
+    """Clamp a parameter away from zero so T=0 or sigma=0 cannot divide by zero.
+
+    The true value at those boundaries is restored by the np.where guard at the
+    end of each Greek, so this only protects the intermediate arithmetic.
+    """
     return np.where(x > 0, x, 1e-9)
 
 
-def theta(S, K, r, q, sigma, T, daily=True):
+def theta(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num,
+          daily: bool = True) -> tuple[Array, Array]:
+    """Theta, -dV/dT: the option's time decay.
+
+    daily divides by 365 to express the value as P&L per calendar day, which is
+    how a desk quotes it. Set daily=False for the raw annual derivative.
+    """
     # making sure T != 0 and sigma != 0
     T_safe, sigma_safe = safety(T), safety(sigma)
 
@@ -47,7 +72,8 @@ def theta(S, K, r, q, sigma, T, daily=True):
         return call, put
 
 
-def delta(S, K, r, q, sigma, T):
+def delta(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num) -> tuple[Array, Array]:
+    """Delta, dV/dS: sensitivity of the option price to the underlying."""
     # making sure T != 0 and sigma != 0
     T_safe, sigma_safe = safety(T), safety(sigma)
 
@@ -64,7 +90,11 @@ def delta(S, K, r, q, sigma, T):
     return call, put
 
 
-def gamma(S, K, r, q, sigma, T):
+def gamma(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num) -> Array:
+    """Gamma, d2V/dS2: the rate of change of delta.
+
+    Identical for a call and a put, so a single array is returned.
+    """
     # making sure T != 0, sigma != 0, S != 0
     T_safe, sigma_safe, S_safe = safety(T), safety(sigma), safety(S)
 
@@ -79,7 +109,13 @@ def gamma(S, K, r, q, sigma, T):
     return np.where(T > 0, gamma_val, 0.0)
 
 
-def vega(S, K, r, q, sigma, T, scaled=True):
+def vega(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num,
+         scaled: bool = True) -> Array:
+    """Vega, dV/dsigma: sensitivity to volatility.
+
+    scaled divides by 100 to express the value per one volatility point, the
+    desk convention. Identical for a call and a put.
+    """
     # making sure T != 0 and sigma != 0
     T_safe, sigma_safe, S_safe = safety(T), safety(sigma), safety(S)
 
@@ -93,7 +129,12 @@ def vega(S, K, r, q, sigma, T, scaled=True):
     return np.where((T > 0) & (sigma > 0) & (S > 0), output, 0.0)
 
 
-def rho(S, K, r, q, sigma, T, scaled=True):
+def rho(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num,
+        scaled: bool = True) -> tuple[Array, Array]:
+    """Rho, dV/dr: sensitivity to the risk-free rate.
+
+    scaled divides by 100 to express the value per one percent rate move.
+    """
     # making sure T != 0 and sigma != 0
     T_safe, sigma_safe = safety(T), safety(sigma)
 
@@ -111,7 +152,12 @@ def rho(S, K, r, q, sigma, T, scaled=True):
     return np.where(T > 0, call, 0.0), np.where(T > 0, put, 0.0)
 
 
-def vanna(S, K, r, q, sigma, T, scaled=True):
+def vanna(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num,
+          scaled: bool = True) -> Array:
+    """Vanna, d2V/dSdsigma: how delta moves as volatility moves.
+
+    scaled divides by 100, per one volatility point. Identical for call and put.
+    """
     # controlling for edge cases
     T_safe, sigma_safe, S_safe = safety(T), safety(sigma), safety(S)
 
@@ -127,7 +173,13 @@ def vanna(S, K, r, q, sigma, T, scaled=True):
     return np.where((T > 0) & (sigma > 0) & (S > 0), output, 0.0)
 
 
-def volga(S, K, r, q, sigma, T, scaled=True):
+def volga(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num,
+          scaled: bool = True) -> Array:
+    """Volga, d2V/dsigma2: the convexity of the option price in volatility.
+
+    scaled divides by 10,000, per one volatility point squared, since the
+    derivative is second order in sigma. Identical for call and put.
+    """
     # controlling for edge cases
     T_safe, sigma_safe, S_safe = safety(T), safety(sigma), safety(S)
 
@@ -144,7 +196,13 @@ def volga(S, K, r, q, sigma, T, scaled=True):
     return np.where((T > 0) & (sigma > 0) & (S > 0), output, 0.0)
 
 
-def charm(S, K, r, q, sigma, T, scaled=True):
+def charm(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num,
+          scaled: bool = True) -> tuple[Array, Array]:
+    """Charm, d2V/dSdT: how delta decays with the passage of time.
+
+    scaled divides by 365, per calendar day. The call and put branches differ in
+    sign convention, so both are returned.
+    """
     # controlling for edge cases
     T_safe, sigma_safe, S_safe = safety(T), safety(sigma), safety(S)
 
@@ -167,7 +225,12 @@ def charm(S, K, r, q, sigma, T, scaled=True):
     return call, put
 
 
-def speed(S, K, r, q, sigma, T):
+def speed(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num) -> Array:
+    """Speed, d3V/dS3: the rate of change of gamma in the underlying.
+
+    Unscaled, since there is no standard desk convention for it. Identical for
+    call and put.
+    """
     # controlling for edge cases
     T_safe, sigma_safe, S_safe = safety(T), safety(sigma), safety(S)
 
@@ -178,7 +241,12 @@ def speed(S, K, r, q, sigma, T):
     return np.where((T > 0) & (sigma > 0) & (S > 0), output, 0.0)
 
 
-def zomma(S, K, r, q, sigma, T, scaled=True):
+def zomma(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num,
+          scaled: bool = True) -> Array:
+    """Zomma, d3V/dS2dsigma: how gamma moves as volatility moves.
+
+    scaled divides by 100, per one volatility point. Identical for call and put.
+    """
     T_safe, sigma_safe, S_safe = safety(T), safety(sigma), safety(S)
 
     d1 = d_1(S_safe, K, r, q, sigma_safe, T_safe)
@@ -194,7 +262,12 @@ def zomma(S, K, r, q, sigma, T, scaled=True):
     return np.where((T > 0) & (sigma > 0) & (S > 0), output, 0.0)
 
 
-def color(S, K, r, q, sigma, T, scaled=True):
+def color(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num,
+          scaled: bool = True) -> Array:
+    """Color, d3V/dS2dT: how gamma decays with the passage of time.
+
+    scaled divides by 365, per calendar day. Identical for call and put.
+    """
     T_safe, sigma_safe, S_safe = safety(T), safety(sigma), safety(S)
     d1 = d_1(S_safe, K, r, q, sigma_safe, T_safe)
     d2 = d1 - sigma_safe * np.sqrt(T_safe)
@@ -211,7 +284,13 @@ def color(S, K, r, q, sigma, T, scaled=True):
     return np.where((T > 0) & (sigma > 0) & (S > 0), output, 0.0)
 
 
-def ultima(S, K, r, q, sigma, T, scaled=True):
+def ultima(S: Num, K: Num, r: Num, q: Num, sigma: Num, T: Num,
+           scaled: bool = True) -> Array:
+    """Ultima, d3V/dsigma3: the third-order sensitivity to volatility.
+
+    scaled divides by 1,000,000, per one volatility point cubed, since the
+    derivative is third order in sigma. Identical for call and put.
+    """
     T_safe, sigma_safe, S_safe = safety(T), safety(sigma), safety(S)
 
     d1 = d_1(S_safe, K, r, q, sigma_safe, T_safe)
